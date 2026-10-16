@@ -1,0 +1,221 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny safety net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Hardened Global Helpers ---
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Administrative verification via root email bootstrap or trusted admins collection
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'brainboosterclasses4@gmail.com' ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
+      );
+    }
+
+    // Helper to check if a student belongs to the required class and is approved
+    function isApprovedStudentInClass(targetClassId) {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'approved' &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.classId == targetClassId;
+    }
+
+    // --- Entity Validators ---
+    function isValidUserCreate(data) {
+      return data.keys().hasAll(['uid', 'email', 'fullName', 'role', 'classId', 'status']) &&
+        data.keys().hasOnly(['uid', 'email', 'fullName', 'role', 'classId', 'className', 'status', 'parentName', 'parentPhone', 'phoneNumber', 'createdAt', 'updatedAt', 'approvedAt', 'approvedBy']) &&
+        data.uid is string && data.uid == request.auth.uid &&
+        data.email is string && data.email.size() <= 256 &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+        data.role in ['student', 'pending'] &&
+        data.status == 'pending' &&
+        data.classId is string && data.classId.size() <= 64;
+    }
+
+    function isValidUserUpdate(data) {
+      return data.uid == existing().uid &&
+        data.email == existing().email &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 100 &&
+        data.role in ['student', 'teacher', 'admin', 'pending'] &&
+        data.status in ['pending', 'approved', 'rejected'] &&
+        data.classId is string && data.classId.size() <= 64;
+    }
+
+    function isValidRecording(data) {
+      return data.keys().hasAll(['id', 'title', 'classId', 'subjectId', 'videoUrl', 'status', 'authorId']) &&
+        data.id is string && data.id.size() <= 64 &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 200 &&
+        data.classId is string && data.classId.size() <= 64 &&
+        data.subjectId is string && data.subjectId.size() <= 64 &&
+        data.videoUrl is string && data.videoUrl.size() <= 1000 &&
+        data.status in ['published', 'draft'] &&
+        data.authorId is string && data.authorId.size() <= 128;
+    }
+
+    function isValidNote(data) {
+      return data.keys().hasAll(['id', 'title', 'classId', 'subjectId', 'fileUrl', 'status', 'authorId']) &&
+        data.id is string && data.id.size() <= 64 &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 200 &&
+        data.classId is string && data.classId.size() <= 64 &&
+        data.subjectId is string && data.subjectId.size() <= 64 &&
+        data.fileUrl is string && data.fileUrl.size() <= 1000 &&
+        data.status in ['published', 'draft'] &&
+        data.authorId is string && data.authorId.size() <= 128;
+    }
+
+    function isValidHomework(data) {
+      return data.keys().hasAll(['id', 'title', 'classId', 'subjectId', 'instructions', 'dueDate', 'status', 'authorId']) &&
+        data.id is string && data.id.size() <= 64 &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 200 &&
+        data.classId is string && data.classId.size() <= 64 &&
+        data.subjectId is string && data.subjectId.size() <= 64 &&
+        data.instructions is string && data.instructions.size() <= 4000 &&
+        data.dueDate is string && data.dueDate.size() <= 50 &&
+        data.status in ['published', 'draft'] &&
+        data.authorId is string && data.authorId.size() <= 128;
+    }
+
+    function isValidSubmission(data) {
+      return data.keys().hasAll(['id', 'homeworkId', 'classId', 'studentId', 'status']) &&
+        data.id is string && data.id.size() <= 128 &&
+        data.homeworkId is string && data.homeworkId.size() <= 64 &&
+        data.classId is string && data.classId.size() <= 64 &&
+        data.studentId is string && data.studentId.size() <= 128 &&
+        data.status in ['submitted', 'reviewed', 'returned'];
+    }
+
+    // --- Collection Security Rules ---
+
+    // Admins registry
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && (request.auth.uid == adminId || isAdmin());
+      allow list: if isAdmin();
+      allow write: if isAdmin() && isValidId(adminId);
+    }
+
+    // Users and Student profiles (Strict PII Isolation)
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && isValidUserCreate(incoming());
+      allow update: if isSignedIn() && isValidId(userId) && (
+        // Admin approval or assignment
+        (isAdmin() && isValidUserUpdate(incoming())) ||
+        // Self update of personal contact details only, cannot alter role or status
+        (request.auth.uid == userId &&
+         incoming().role == existing().role &&
+         incoming().status == existing().status &&
+         incoming().classId == existing().classId &&
+         isValidUserUpdate(incoming()) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'parentName', 'parentPhone', 'phoneNumber', 'updatedAt']))
+      );
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Academic Classes
+    match /classes/{classId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin() && isValidId(classId);
+    }
+
+    // Subjects
+    match /subjects/{subjectId} {
+      allow get, list: if isSignedIn();
+      allow write: if isAdmin() && isValidId(subjectId);
+    }
+
+    // OBS Class Recordings
+    match /recordings/{recordingId} {
+      allow get: if isSignedIn() && isValidId(recordingId) && (
+        isAdmin() ||
+        (existing().status == 'published' && isApprovedStudentInClass(existing().classId))
+      );
+      allow list: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.status == 'published'
+      );
+      allow create: if isAdmin() && isValidId(recordingId) && isValidRecording(incoming());
+      allow update: if isAdmin() && isValidId(recordingId) && isValidRecording(incoming());
+      allow delete: if isAdmin() && isValidId(recordingId);
+    }
+
+    // Note3 PDF Notes and Study Materials
+    match /notes/{noteId} {
+      allow get: if isSignedIn() && isValidId(noteId) && (
+        isAdmin() ||
+        (existing().status == 'published' && isApprovedStudentInClass(existing().classId))
+      );
+      allow list: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.status == 'published'
+      );
+      allow create: if isAdmin() && isValidId(noteId) && isValidNote(incoming());
+      allow update: if isAdmin() && isValidId(noteId) && isValidNote(incoming());
+      allow delete: if isAdmin() && isValidId(noteId);
+    }
+
+    // Homework Assignments
+    match /homework/{homeworkId} {
+      allow get: if isSignedIn() && isValidId(homeworkId) && (
+        isAdmin() ||
+        (existing().status == 'published' && isApprovedStudentInClass(existing().classId))
+      );
+      allow list: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.status == 'published'
+      );
+      allow create: if isAdmin() && isValidId(homeworkId) && isValidHomework(incoming());
+      allow update: if isAdmin() && isValidId(homeworkId) && isValidHomework(incoming());
+      allow delete: if isAdmin() && isValidId(homeworkId);
+    }
+
+    // Homework Submissions
+    match /submissions/{submissionId} {
+      allow get: if isSignedIn() && isValidId(submissionId) && (
+        isAdmin() ||
+        existing().studentId == request.auth.uid
+      );
+      allow list: if isSignedIn() && (
+        isAdmin() ||
+        resource.data.studentId == request.auth.uid
+      );
+      allow create: if isSignedIn() && isValidId(submissionId) &&
+        incoming().studentId == request.auth.uid &&
+        isValidSubmission(incoming());
+      allow update: if isSignedIn() && isValidId(submissionId) && (
+        // Teacher grading and feedback
+        (isAdmin() && isValidSubmission(incoming()) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['status', 'marks', 'feedback', 'reviewedAt', 'reviewedBy'])) ||
+        // Student editing own submission before review
+        (existing().studentId == request.auth.uid &&
+         existing().status == 'submitted' &&
+         incoming().studentId == request.auth.uid &&
+         incoming().status == 'submitted' &&
+         isValidSubmission(incoming()) &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['answerText', 'attachmentUrl', 'submittedAt']))
+      );
+      allow delete: if isAdmin() && isValidId(submissionId);
+    }
+  }
+}

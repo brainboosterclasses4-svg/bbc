@@ -1,0 +1,6 @@
+{
+  "name": "Brain Booster Classes - Online Learning Portal",
+  "description": "Secure, mobile-friendly online coaching portal for Brain Booster Classes featuring OBS class recordings, Note3 PDF notes, homework assignments, student approval workflows, and class-specific learning materials.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

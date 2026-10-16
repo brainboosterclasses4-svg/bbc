@@ -1,0 +1,186 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with role, class assignment, and approval state",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "maxLength": 128 },
+        "email": { "type": "string", "maxLength": 256 },
+        "fullName": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["student", "teacher", "admin", "pending"] },
+        "classId": { "type": "string", "maxLength": 64 },
+        "className": { "type": "string", "maxLength": 64 },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "parentName": { "type": "string", "maxLength": 100 },
+        "parentPhone": { "type": "string", "maxLength": 25 },
+        "phoneNumber": { "type": "string", "maxLength": 25 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "approvedAt": { "type": "string" },
+        "approvedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["uid", "email", "fullName", "role", "classId", "status"]
+    },
+    "ClassItem": {
+      "title": "ClassItem",
+      "description": "Academic class representation (Class 6 to Class 12)",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 64 },
+        "order": { "type": "number" },
+        "description": { "type": "string", "maxLength": 250 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name"]
+    },
+    "SubjectItem": {
+      "title": "SubjectItem",
+      "description": "Academic subject under a class",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "name": { "type": "string", "maxLength": 100 },
+        "color": { "type": "string", "maxLength": 32 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "classId", "name"]
+    },
+    "Recording": {
+      "title": "Recording",
+      "description": "OBS class recording with video link and metadata",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 200 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "subjectName": { "type": "string", "maxLength": 100 },
+        "chapterTitle": { "type": "string", "maxLength": 150 },
+        "lessonDate": { "type": "string", "maxLength": 30 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "videoUrl": { "type": "string", "maxLength": 1000 },
+        "thumbnailUrl": { "type": "string", "maxLength": 1000 },
+        "duration": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "classId", "subjectId", "videoUrl", "status", "authorId"]
+    },
+    "Note": {
+      "title": "Note",
+      "description": "Note3 PDF notes and study materials",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 200 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "subjectName": { "type": "string", "maxLength": 100 },
+        "chapterTitle": { "type": "string", "maxLength": 150 },
+        "description": { "type": "string", "maxLength": 2000 },
+        "fileUrl": { "type": "string", "maxLength": 1000 },
+        "fileSize": { "type": "string", "maxLength": 30 },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "classId", "subjectId", "fileUrl", "status", "authorId"]
+    },
+    "Homework": {
+      "title": "Homework",
+      "description": "Homework and assignment tasks assigned to classes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 64 },
+        "title": { "type": "string", "maxLength": 200 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "subjectId": { "type": "string", "maxLength": 64 },
+        "subjectName": { "type": "string", "maxLength": 100 },
+        "chapterTitle": { "type": "string", "maxLength": 150 },
+        "instructions": { "type": "string", "maxLength": 4000 },
+        "attachmentUrl": { "type": "string", "maxLength": 1000 },
+        "dueDate": { "type": "string", "maxLength": 50 },
+        "totalMarks": { "type": "number" },
+        "status": { "type": "string", "enum": ["published", "draft"] },
+        "authorId": { "type": "string", "maxLength": 128 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "title", "classId", "subjectId", "instructions", "dueDate", "status", "authorId"]
+    },
+    "Submission": {
+      "title": "Submission",
+      "description": "Student homework submission with evaluation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "maxLength": 128 },
+        "homeworkId": { "type": "string", "maxLength": 64 },
+        "homeworkTitle": { "type": "string", "maxLength": 200 },
+        "classId": { "type": "string", "maxLength": 64 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 100 },
+        "studentEmail": { "type": "string", "maxLength": 256 },
+        "answerText": { "type": "string", "maxLength": 8000 },
+        "attachmentUrl": { "type": "string", "maxLength": 1000 },
+        "status": { "type": "string", "enum": ["submitted", "reviewed", "returned"] },
+        "submittedAt": { "type": "string" },
+        "reviewedAt": { "type": "string" },
+        "marks": { "type": "number" },
+        "feedback": { "type": "string", "maxLength": 2000 },
+        "reviewedBy": { "type": "string", "maxLength": 128 }
+      },
+      "required": ["id", "homeworkId", "classId", "studentId", "status"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Document marking a user as an authorized teacher or admin",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 256 },
+        "role": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "Student and staff profiles"
+    },
+    "/classes/{classId}": {
+      "schema": { "$ref": "#/entities/ClassItem" },
+      "description": "Supported classes"
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/SubjectItem" },
+      "description": "Class subjects"
+    },
+    "/recordings/{recordingId}": {
+      "schema": { "$ref": "#/entities/Recording" },
+      "description": "OBS class recordings"
+    },
+    "/notes/{noteId}": {
+      "schema": { "$ref": "#/entities/Note" },
+      "description": "PDF notes and study materials"
+    },
+    "/homework/{homeworkId}": {
+      "schema": { "$ref": "#/entities/Homework" },
+      "description": "Homework assignments"
+    },
+    "/submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/Submission" },
+      "description": "Homework submissions and marks"
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Verified admin and teacher identifiers"
+    }
+  }
+}
